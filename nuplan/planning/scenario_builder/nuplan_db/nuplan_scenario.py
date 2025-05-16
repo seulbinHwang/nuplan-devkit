@@ -71,8 +71,11 @@ class NuPlanScenario(AbstractScenario):
     ) -> None:
         """
         Initialize the nuPlan scenario.
-        :param data_root: The prefix for the log file. e.g. "/data/root/nuplan". For remote paths, this is where the file will be downloaded if necessary.
-        :param log_file_load_path: Name of the log that this scenario belongs to. e.g. "/data/sets/nuplan-v1.1/splits/mini/2021.07.16.20.45.29_veh-35_01095_01486.db", "s3://path/to/db.db"
+        :param data_root: The prefix for the log file. e.g. "/data/root/nuplan".
+            For remote paths, this is where the file will be downloaded if necessary.
+        :param log_file_load_path: Name of the log that this scenario belongs to.
+            e.g. "/data/sets/nuplan-v1.1/splits/mini/2021.07.16.20.45.29_veh-35_01095_01486.db",
+            "s3://path/to/db.db"
         :param initial_lidar_token: Token of the scenario's initial lidarpc.
         :param initial_lidar_timestamp: The timestamp of the initial lidarpc.
         :param scenario_type: Type of scenario (e.g. ego overtaking).
@@ -88,8 +91,8 @@ class NuPlanScenario(AbstractScenario):
         self._local_store: Optional[LocalStore] = None
         self._remote_store: Optional[S3Store] = None
 
-        self._data_root = data_root
-        self._log_file_load_path = log_file_load_path
+        self._data_root = data_root #
+        self._log_file_load_path = log_file_load_path #
         self._initial_lidar_token = initial_lidar_token
         self._initial_lidar_timestamp = initial_lidar_timestamp
         self._scenario_type = scenario_type
