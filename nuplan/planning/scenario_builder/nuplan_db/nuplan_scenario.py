@@ -1,10 +1,12 @@
 from __future__ import annotations
+from collections import defaultdict
 
 import os
+from nuplan.common.actor_state.tracked_objects_types import TrackedObjectType
+
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Generator, List, Optional, Set, Tuple, Type, cast
-
+from typing import Any, Generator, List, Optional, Set, Tuple, Type, cast, Dict
 from nuplan.common.actor_state.ego_state import EgoState
 from nuplan.common.actor_state.state_representation import StateSE2, TimePoint
 from nuplan.common.actor_state.vehicle_parameters import VehicleParameters
@@ -243,6 +245,72 @@ class NuPlanScenario(AbstractScenario):
         roadblock_ids = get_roadblock_ids_for_lidarpc_token_from_db(self._log_file, self._initial_lidar_token)
         assert roadblock_ids is not None, "Unable to find Roadblock ids for current scenario"
         return cast(List[str], roadblock_ids)
+
+    # def get_npc_route_roadblock_ids(self) -> Dict[
+    #     str, List[str]]:
+    #     """
+    #     NPC 에이전트 궤적의 lane/lane connector 연결성을 따라
+    #     roadblock ID 시퀀스를 추출합니다.
+    #     """
+    #     # 1) 에이전트별 StateSE2 리스트 수집
+    #     trajectories: Dict[str, List[StateSE2]] = {}
+    #     for t in range(self.get_number_of_iterations()):
+    #         dets = self.get_tracked_objects_at_iteration(t)
+    #         for obj in dets.tracked_objects:
+    #             if obj.tracked_object_type != TrackedObjectType.VEHICLE:
+    #                 continue
+    #             token = obj.track_token
+    #             # StateSE2(x, y, heading) — heading은 필요 없으니 0.0 으로 둬도 무방
+    #             state = StateSE2(obj.center.x, obj.center.y, 0.0)
+    #             trajectories.setdefault(token, []).append(state)
+    #
+    #     # 2) get_roadblock_ids_from_trajectory 로 연결성 기반 경로 추출
+    #     result: Dict[str, List[str]] = {}
+    #     for token, states in trajectories.items():
+    #         if not states:
+    #             continue
+    #         road_ids = get_roadblock_ids_from_trajectory(self.map_api,
+    #                                                      states)
+    #         result[token] = road_ids
+    #
+    #     return result
+
+    def get_npc_route_roadblock_ids(self) -> Dict[str, List[str]]:
+        """
+        get_future_tracked_objects를 이용해 한 번에 궤적을 수집하고,
+        get_roadblock_ids_from_trajectory로 연결성 기반 ID 시퀀스를 추출합니다.
+        """
+        # 1) 에이전트별 StateSE2 리스트 수집
+        trajectories: Dict[str, List[StateSE2]] = defaultdict(list)
+
+        # iteration=0 시점부터 시나리오 끝까지 future 트랙 객체를 한줄로 가져옴
+        # 전체 horizon은 시나리오 총 길이(초)로 지정
+        start_time = self.get_time_point(0).time_s
+        end_time = self.get_time_point(self.get_number_of_iterations() - 1).time_s
+        horizon  = end_time - start_time
+
+        for dets in self.get_future_tracked_objects(0, horizon):
+            """
+            det : DetectionsTracks (해당 시점에 트래킹된 모든 객체 정보)
+            dets.tracked_objects: List[TrackedObject]
+            obj.track_token: str
+                DB에서 부여된 “트랙 고유 토큰”
+            """
+            for obj in dets.tracked_objects:
+                if obj.tracked_object_type != TrackedObjectType.VEHICLE:
+                    continue
+                token = obj.track_token
+                # StateSE2(x, y, heading) — heading은 필요 없으니 0.0 고정
+                trajectories[token].append(StateSE2(obj.center.x, obj.center.y, 0.0))
+
+        # 2) 연결성 기반 roadblock ID 추출
+        result: Dict[str, List[str]] = {}
+        for token, states in trajectories.items():
+            if not states:
+                continue
+            result[token] = get_roadblock_ids_from_trajectory(self.map_api, states)
+
+        return result
 
     def get_expert_goal_state(self) -> StateSE2:
         """Inherited, see superclass."""
