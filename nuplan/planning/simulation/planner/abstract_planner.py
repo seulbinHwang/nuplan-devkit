@@ -4,7 +4,7 @@ import abc
 import time
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, Optional, Type
+from typing import Any, List, Optional, Type, Dict
 
 from nuplan.common.actor_state.state_representation import StateSE2
 from nuplan.common.maps.abstract_map import AbstractMap
@@ -25,6 +25,11 @@ class PlannerInitialization:
     route_roadblock_ids: List[str]  # Roadblock ids comprising goal route
     mission_goal: StateSE2  # The mission goal which commonly is not achievable in a single scenario
     map_api: AbstractMap  # The API towards maps.
+    npc_route_roadblock_ids: Optional[Dict[str, Optional[
+        List[str]]]] = None  # Roadblock ids of the NPCs in the scenario
+    tokens_to_position: Optional[Dict[str, Optional[
+        np.
+        ndarray]]] = None  # Mapping from roadblock token to position in the map
 
 
 @dataclass(frozen=True)

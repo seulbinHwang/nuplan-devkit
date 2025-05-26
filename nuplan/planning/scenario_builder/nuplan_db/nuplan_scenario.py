@@ -1,15 +1,21 @@
 from __future__ import annotations
-
+from collections import defaultdict
+from types import SimpleNamespace
+from nuplan.common.maps.abstract_map_objects import LaneGraphEdgeMapObject, RoadBlockGraphEdgeMapObject, StopLine
+from collections import defaultdict
+from typing import Dict, List, Optional, Set
+import numpy as np
+from shapely.geometry import Point
 import os
+from nuplan.common.actor_state.tracked_objects_types import TrackedObjectType
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Generator, List, Optional, Set, Tuple, Type, cast
-
+from typing import Any, Generator, List, Optional, Set, Tuple, Type, cast, Dict
 from nuplan.common.actor_state.ego_state import EgoState
 from nuplan.common.actor_state.state_representation import StateSE2, TimePoint
 from nuplan.common.actor_state.vehicle_parameters import VehicleParameters
 from nuplan.common.maps.abstract_map import AbstractMap
-from nuplan.common.maps.maps_datatypes import TrafficLightStatusData, TrafficLightStatuses, Transform
+from nuplan.common.maps.maps_datatypes import TrafficLightStatusData, TrafficLightStatuses, Transform, SemanticMapLayer
 from nuplan.common.maps.nuplan_map.map_factory import get_maps_api
 from nuplan.common.maps.nuplan_map.utils import get_roadblock_ids_from_trajectory
 from nuplan.database.common.blob_store.local_store import LocalStore
@@ -71,8 +77,11 @@ class NuPlanScenario(AbstractScenario):
     ) -> None:
         """
         Initialize the nuPlan scenario.
-        :param data_root: The prefix for the log file. e.g. "/data/root/nuplan". For remote paths, this is where the file will be downloaded if necessary.
-        :param log_file_load_path: Name of the log that this scenario belongs to. e.g. "/data/sets/nuplan-v1.1/splits/mini/2021.07.16.20.45.29_veh-35_01095_01486.db", "s3://path/to/db.db"
+        :param data_root: The prefix for the log file. e.g. "/data/root/nuplan".
+            For remote paths, this is where the file will be downloaded if necessary.
+        :param log_file_load_path: Name of the log that this scenario belongs to.
+            e.g. "/data/sets/nuplan-v1.1/splits/mini/2021.07.16.20.45.29_veh-35_01095_01486.db",
+            "s3://path/to/db.db"
         :param initial_lidar_token: Token of the scenario's initial lidarpc.
         :param initial_lidar_timestamp: The timestamp of the initial lidarpc.
         :param scenario_type: Type of scenario (e.g. ego overtaking).
@@ -242,6 +251,207 @@ class NuPlanScenario(AbstractScenario):
             self._log_file, self._initial_lidar_token)
         assert roadblock_ids is not None, "Unable to find Roadblock ids for current scenario"
         return cast(List[str], roadblock_ids)
+
+    def get_npc_route_roadblock_ids(self) -> Dict[str, Optional[List[str]]]:
+
+        def select_nearest_connectors_by_mean_distance(
+            connector_candidates: List[RoadBlockGraphEdgeMapObject],
+            sampled_trajectory_points: List["Point2D"],
+            *,
+            tolerance: float = 1e-6,
+        ) -> List[RoadBlockGraphEdgeMapObject]:
+            """
+            궤적과 RoadBlock-Connector 후보군 사이의 평균 수선 거리를 계산해
+            가장 가까운(=평균 거리가 최소) Connector 들을 **모두** 반환한다.
+
+            Args:
+                connector_candidates : 거리 비교 대상이 되는 RoadBlock-Connector 객체 리스트
+                sampled_trajectory_points : ROADBLOCK_CONNECTOR 구간에서 수집한 궤적 포인트들
+                tolerance : float
+                    부동소수점 오차 보정을 위한 허용 오차.
+                    ``abs(dist - min_dist) ≤ tolerance`` 이면 동률로 처리
+                verbose : bool
+                    True 이면 각 후보의 거리와 선택 결과를 stdout 으로 출력
+
+            Returns:
+                List[RoadBlockGraphEdgeMapObject] :
+                    최소 평균 거리를 가진 Connector 객체(들).
+                    (복수일 수 있음)
+            """
+            # 1) 각 후보 ↔ 궤적 사이 평균 수선거리 계산
+            mean_distance_by_connector: Dict[RoadBlockGraphEdgeMapObject,
+                                             float] = {}
+            for connector in connector_candidates:
+                mean_dist: float = _mean_perpendicular_distance(
+                    connector, sampled_trajectory_points)
+                mean_distance_by_connector[connector] = mean_dist
+
+            # 2) 최솟값과 동률(±tolerance)인 후보 추출
+            minimum_distance: float = min(mean_distance_by_connector.values())
+            nearest_connectors: List[RoadBlockGraphEdgeMapObject] = [
+                conn for conn, dist in mean_distance_by_connector.items()
+                if abs(dist - minimum_distance) <= tolerance
+            ]
+
+            return nearest_connectors
+
+        def _decide_roadblock_ids_at_connector(
+            connector_candidate_objects: Set['RoadBlockGraphEdgeMapObject'],
+            sampled_points_inside_connector: List['Point2D'],
+            roadblock_sequence: List[str],
+            previous_roadblocks_set: Set['RoadBlockGraphEdgeMapObject'],
+            current_roadblocks: Set['RoadBlockGraphEdgeMapObject'],
+        ) -> None:
+            graph_linkable_connectors = []
+            graph_linkable_connectors_candidates = []
+            incoming_and_outcoming_condition = len(
+                previous_roadblocks_set) > 0 and len(current_roadblocks) > 0
+            incoming_or_outgoing_condition = len(
+                previous_roadblocks_set) > 0 or len(current_roadblocks) > 0
+            if incoming_and_outcoming_condition:
+                for conn in connector_candidate_objects:
+                    incoming_ids = {rb.id for rb in conn.incoming_edges}
+                    previous_ids = {rb.id for rb in previous_roadblocks_set}
+                    incoming_condition = bool(previous_ids & incoming_ids)
+
+                    outgoing_ids = {rb.id for rb in conn.outgoing_edges}
+                    current_ids = {rb.id for rb in current_roadblocks}
+                    outgoing_condition = bool(current_ids & outgoing_ids)
+
+                    if incoming_condition and outgoing_condition:
+                        graph_linkable_connectors.append(conn)
+                if graph_linkable_connectors:
+                    roadblock_sequence.extend(
+                        [conn.id for conn in graph_linkable_connectors])
+
+                    return
+            if (incoming_and_outcoming_condition or
+                    incoming_or_outgoing_condition):
+                for conn in connector_candidate_objects:
+                    incoming_ids = {rb.id for rb in conn.incoming_edges}
+                    previous_ids = {rb.id for rb in previous_roadblocks_set}
+                    incoming_condition = bool(previous_ids & incoming_ids)
+
+                    outgoing_ids = {rb.id for rb in conn.outgoing_edges}
+                    current_ids = {rb.id for rb in current_roadblocks}
+                    outgoing_condition = bool(current_ids & outgoing_ids)
+
+                    if incoming_condition or outgoing_condition:
+                        graph_linkable_connectors_candidates.append(conn)
+                if graph_linkable_connectors_candidates:
+                    # 평균 거리 기반 최적 RBC 선택
+                    closest_connectors = select_nearest_connectors_by_mean_distance(
+                        graph_linkable_connectors_candidates,
+                        sampled_points_inside_connector,
+                        tolerance=1e-6,
+                    )
+                    roadblock_sequence.extend(
+                        conn.id for conn in closest_connectors)
+                    return
+            # 평균 거리 기반 최적 RBC 선택
+            closest_connectors = select_nearest_connectors_by_mean_distance(
+                connector_candidate_objects,
+                sampled_points_inside_connector,
+                tolerance=1e-6,
+            )
+            roadblock_sequence.extend(conn.id for conn in closest_connectors)
+
+        def _mean_perpendicular_distance(
+                roadblock_connector,
+                trajectory_points: List['Point2D']) -> float:
+            """궤적 점들과 RBC 폴리곤 간 평균 거리를 계산."""
+            polygon = roadblock_connector.polygon  # NuPlan 에서는 scaled‑width polygon 제공
+            return float(
+                np.mean([
+                    Point(pt.x, pt.y).distance(polygon)
+                    for pt in trajectory_points
+                ]))
+
+        # ─────────── 1단계: 차량별 프레임 수집 ────────────
+        token_to_trajectory: Dict[str, List['SceneObject']] = defaultdict(list)
+        total_horizon_s = (
+            self.get_time_point(self.get_number_of_iterations() - 1).time_s -
+            self.get_time_point(0).time_s)
+        for det_batch in self.get_future_tracked_objects(0, total_horizon_s):
+            for det in det_batch.tracked_objects:
+                if det.tracked_object_type == TrackedObjectType.VEHICLE:
+                    token_to_trajectory[det.track_token].append(det)
+
+        token_to_route_roadblock_ids: Dict[str, Optional[List[str]]] = {}
+        # TODO: token_to_position 는 디버깅용 이므로, 디버깅이 끝나면 지우는 것이 좋습니다.
+        token_to_position: Dict[str, Optional[List[np.ndarray]]] = {}
+        # ─────────── 2단계: 에이전트별 경로 생성 ────────────
+        for agent_token, frame_list in token_to_trajectory.items():
+            token_to_position[agent_token] = []
+            if not frame_list:
+                token_to_route_roadblock_ids[agent_token] = None
+                continue
+
+            roadblock_sequence: List[str] = []
+            previous_roadblocks_set: Set['RoadBlockGraphEdgeMapObject'] = set()
+            inside_connector_flag = False
+            connector_candidate_objects: Set[
+                'RoadBlockGraphEdgeMapObject'] = set()
+            sampled_points_inside_connector: List['Point2D'] = []
+
+            for time_idx, frame in enumerate(frame_list):  # 시간 순
+                npc_point = frame.center.point
+                token_to_position[agent_token].append(
+                    np.array([npc_point.x, npc_point.y]))
+                current_roadblocks = set(
+                    self.map_api.get_all_map_objects(
+                        npc_point, SemanticMapLayer.ROADBLOCK))
+                current_connectors = set(
+                    self.map_api.get_all_map_objects(
+                        npc_point, SemanticMapLayer.ROADBLOCK_CONNECTOR))
+                if current_roadblocks and current_connectors:
+                    raise ValueError(
+                        "Both RoadBlock and RoadBlock-Connector found at the same point. "
+                    )
+                # ── (A) RBC 영역 ─────────────────────────────
+                if current_connectors:
+                    if not inside_connector_flag:  # 새 구간 시작
+                        connector_candidate_objects.clear()
+                        sampled_points_inside_connector.clear()
+                        inside_connector_flag = True
+                    connector_candidate_objects.update(current_connectors)
+                    sampled_points_inside_connector.append(npc_point)
+                    if time_idx == len(
+                            frame_list) - 1:  # 마지막 프레임 # 8b5f797c287856f0
+                        inside_connector_flag = _decide_roadblock_ids_at_connector(
+                            connector_candidate_objects,
+                            sampled_points_inside_connector, roadblock_sequence,
+                            previous_roadblocks_set, current_roadblocks)
+                        inside_connector_flag = False
+                        connector_candidate_objects.clear()
+                        sampled_points_inside_connector.clear()
+                    continue
+
+                # ── (B) RoadBlock 영역 ───────────────────────
+                if current_roadblocks:
+                    # 방금 전까지 RBC였다면 후보 결정 필요
+                    if inside_connector_flag:
+                        inside_connector_flag = _decide_roadblock_ids_at_connector(
+                            connector_candidate_objects,
+                            sampled_points_inside_connector, roadblock_sequence,
+                            previous_roadblocks_set, current_roadblocks)
+                        inside_connector_flag = False
+                        connector_candidate_objects.clear()
+                        sampled_points_inside_connector.clear()
+                    # 현재 RoadBlock id 추가 (중복 방지)
+                    for roadblock in current_roadblocks:
+                        if not roadblock_sequence or roadblock_sequence[
+                                -1] != roadblock.id:
+                            roadblock_sequence.append(roadblock.id)
+                    previous_roadblocks_set = current_roadblocks
+
+            token_to_route_roadblock_ids[
+                agent_token] = roadblock_sequence if roadblock_sequence else None
+            # token_to_position: Dict[str, Optional[List[np.ndarray]]] -> Dict[str, Optional[np.ndarray]]
+            if token_to_position[agent_token]:
+                token_to_position[agent_token] = np.array(
+                    token_to_position[agent_token])
+        return token_to_route_roadblock_ids, token_to_position
 
     def get_expert_goal_state(self) -> StateSE2:
         """Inherited, see superclass."""
