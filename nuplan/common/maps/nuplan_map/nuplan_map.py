@@ -43,20 +43,31 @@ class NuPlanMap(AbstractMap):
         self._maps_db = maps_db
         self._vector_map: Dict[str, VectorLayer] = defaultdict(VectorLayer)
         self._raster_map: Dict[str, RasterLayer] = defaultdict(RasterLayer)
-        self._map_objects: Dict[SemanticMapLayer, Dict[str, MapObject]] = defaultdict(dict)
+        self._map_objects: Dict[SemanticMapLayer,
+                                Dict[str, MapObject]] = defaultdict(dict)
         self._map_name = map_name
 
-        self._map_object_getter: Dict[SemanticMapLayer, Callable[[str], MapObject]] = {
-            SemanticMapLayer.LANE: self._get_lane,
-            SemanticMapLayer.LANE_CONNECTOR: self._get_lane_connector,
-            SemanticMapLayer.ROADBLOCK: self._get_roadblock,
-            SemanticMapLayer.ROADBLOCK_CONNECTOR: self._get_roadblock_connector,
-            SemanticMapLayer.STOP_LINE: self._get_stop_line,
-            SemanticMapLayer.CROSSWALK: self._get_crosswalk,
-            SemanticMapLayer.INTERSECTION: self._get_intersection,
-            SemanticMapLayer.WALKWAYS: self._get_walkway,
-            SemanticMapLayer.CARPARK_AREA: self._get_carpark_area,
-        }
+        self._map_object_getter: Dict[SemanticMapLayer,
+                                      Callable[[str], MapObject]] = {
+                                          SemanticMapLayer.LANE:
+                                              self._get_lane,
+                                          SemanticMapLayer.LANE_CONNECTOR:
+                                              self._get_lane_connector,
+                                          SemanticMapLayer.ROADBLOCK:
+                                              self._get_roadblock,
+                                          SemanticMapLayer.ROADBLOCK_CONNECTOR:
+                                              self._get_roadblock_connector,
+                                          SemanticMapLayer.STOP_LINE:
+                                              self._get_stop_line,
+                                          SemanticMapLayer.CROSSWALK:
+                                              self._get_crosswalk,
+                                          SemanticMapLayer.INTERSECTION:
+                                              self._get_intersection,
+                                          SemanticMapLayer.WALKWAYS:
+                                              self._get_walkway,
+                                          SemanticMapLayer.CARPARK_AREA:
+                                              self._get_carpark_area,
+                                      }
 
         self._vector_layer_mapping = {
             SemanticMapLayer.LANE: 'lanes_polygons',
@@ -119,27 +130,33 @@ class NuPlanMap(AbstractMap):
         """Inherited, see superclass."""
         if layer == SemanticMapLayer.TURN_STOP:
             stop_lines = self._get_vector_map_layer(SemanticMapLayer.STOP_LINE)
-            in_stop_line = stop_lines.loc[stop_lines.contains(geom.Point(point.x, point.y))]
+            in_stop_line = stop_lines.loc[stop_lines.contains(
+                geom.Point(point.x, point.y))]
 
-            return any(in_stop_line.loc[in_stop_line["stop_polygon_type_fid"] == StopLineType.TURN_STOP.value].values)
+            return any(in_stop_line.loc[in_stop_line["stop_polygon_type_fid"] ==
+                                        StopLineType.TURN_STOP.value].values)
 
-        return bool(is_in_type(point.x, point.y, self._get_vector_map_layer(layer)))
+        return bool(
+            is_in_type(point.x, point.y, self._get_vector_map_layer(layer)))
 
-    def get_all_map_objects(self, point: Point2D, layer: SemanticMapLayer) -> List[MapObject]:
+    def get_all_map_objects(self, point: Point2D,
+                            layer: SemanticMapLayer) -> List[MapObject]:
         """Inherited, see superclass."""
         try:
             return self._get_all_map_objects(point, layer)
         except KeyError:
-            raise ValueError(f"Object representation for layer: {layer.name} is unavailable")
+            raise ValueError(
+                f"Object representation for layer: {layer.name} is unavailable")
 
-    def get_one_map_object(self, point: Point2D, layer: SemanticMapLayer) -> Optional[MapObject]:
+    def get_one_map_object(self, point: Point2D,
+                           layer: SemanticMapLayer) -> Optional[MapObject]:
         """Inherited, see superclass."""
         map_objects = self.get_all_map_objects(point, layer)
 
         if len(map_objects) > 1:
             raise AssertionError(
-                f"{len(map_objects)} map objects found. Expected only one. " "Try using get_all_map_objects()"
-            )
+                f"{len(map_objects)} map objects found. Expected only one. "
+                "Try using get_all_map_objects()")
 
         if len(map_objects) == 0:
             return None
@@ -155,9 +172,13 @@ class NuPlanMap(AbstractMap):
         patch = geom.box(x_min, y_min, x_max, y_max)
 
         supported_layers = self.get_available_map_objects()
-        unsupported_layers = [layer for layer in layers if layer not in supported_layers]
+        unsupported_layers = [
+            layer for layer in layers if layer not in supported_layers
+        ]
 
-        assert len(unsupported_layers) == 0, f"Object representation for layer(s): {unsupported_layers} is unavailable"
+        assert len(
+            unsupported_layers
+        ) == 0, f"Object representation for layer(s): {unsupported_layers} is unavailable"
 
         object_map: Dict[SemanticMapLayer, List[MapObject]] = defaultdict(list)
 
@@ -166,27 +187,31 @@ class NuPlanMap(AbstractMap):
 
         return object_map
 
-    def get_map_object(self, object_id: str, layer: SemanticMapLayer) -> Optional[MapObject]:
+    def get_map_object(self, object_id: str,
+                       layer: SemanticMapLayer) -> Optional[MapObject]:
         """Inherited, see superclass."""
         try:
             if object_id not in self._map_objects[layer]:
-                map_object: MapObject = self._map_object_getter[layer](object_id)
+                map_object: MapObject = self._map_object_getter[layer](
+                    object_id)
                 self._map_objects[layer][object_id] = map_object
 
             return self._map_objects[layer][object_id]
         except KeyError:
-            raise ValueError(f"Object representation for layer: {layer.name} object: {object_id} is unavailable")
+            raise ValueError(
+                f"Object representation for layer: {layer.name} object: {object_id} is unavailable"
+            )
 
     def get_distance_to_nearest_map_object(
-        self, point: Point2D, layer: SemanticMapLayer
-    ) -> Tuple[Optional[str], Optional[float]]:
+            self, point: Point2D,
+            layer: SemanticMapLayer) -> Tuple[Optional[str], Optional[float]]:
         """Inherited from superclass."""
         surfaces = self._get_vector_map_layer(layer)
 
         if surfaces is not None:
             surfaces['distance_to_point'] = surfaces.apply(
-                lambda row: geom.Point(point.x, point.y).distance(row.geometry), axis=1
-            )
+                lambda row: geom.Point(point.x, point.y).distance(row.geometry),
+                axis=1)
             surfaces = surfaces.sort_values(by='distance_to_point')
 
             # A single surface might be made up of multiple polygons (due to an old practice of annotating a long
@@ -202,13 +227,14 @@ class NuPlanMap(AbstractMap):
 
         return nearest_surface_id, nearest_surface_distance
 
-    def get_distance_to_nearest_raster_layer(self, point: Point2D, layer: SemanticMapLayer) -> float:
+    def get_distance_to_nearest_raster_layer(self, point: Point2D,
+                                             layer: SemanticMapLayer) -> float:
         """Inherited from superclass"""
         raise NotImplementedError
 
     def get_distances_matrix_to_nearest_map_object(
-        self, points: List[Point2D], layer: SemanticMapLayer
-    ) -> Optional[npt.NDArray[np.float64]]:
+            self, points: List[Point2D],
+            layer: SemanticMapLayer) -> Optional[npt.NDArray[np.float64]]:
         """
         Returns the distance matrix (in meters) between a list of points and their nearest desired surface.
             That distance is the L1 norm from the point to the closest location on the surface.
@@ -220,10 +246,12 @@ class NuPlanMap(AbstractMap):
 
         if surfaces is not None:
             # Construct geo series
-            corner_points = geopandas.GeoSeries([geom.Point(point.x, point.y) for point in points])
+            corner_points = geopandas.GeoSeries(
+                [geom.Point(point.x, point.y) for point in points])
 
             # Distance
-            distances = surfaces.geometry.apply(lambda g: corner_points.distance(g))
+            distances = surfaces.geometry.apply(
+                lambda g: corner_points.distance(g))
 
             # Distance to the nearest surface
             distances = np.asarray(distances.min())
@@ -279,8 +307,10 @@ class NuPlanMap(AbstractMap):
         :return: the loaded RasterLayer.
         """
         if layer_name not in self._raster_map:
-            map_layer: MapLayer = self._maps_db.load_layer(self._map_name, layer_name)
-            self._raster_map[layer_name] = raster_layer_from_map_layer(map_layer)
+            map_layer: MapLayer = self._maps_db.load_layer(
+                self._map_name, layer_name)
+            self._raster_map[layer_name] = raster_layer_from_map_layer(
+                map_layer)
 
         return self._raster_map[layer_name]
 
@@ -295,10 +325,12 @@ class NuPlanMap(AbstractMap):
             if layer_name == 'drivable_area':
                 self._initialize_drivable_area()
             else:
-                self._vector_map[layer_name] = self._maps_db.load_vector_layer(self._map_name, layer_name)
+                self._vector_map[layer_name] = self._maps_db.load_vector_layer(
+                    self._map_name, layer_name)
         return self._vector_map[layer_name]
 
-    def _get_all_map_objects(self, point: Point2D, layer: SemanticMapLayer) -> List[MapObject]:
+    def _get_all_map_objects(self, point: Point2D,
+                             layer: SemanticMapLayer) -> List[MapObject]:
         """
         Gets a list of lanes where its polygon overlaps the queried point.
         :param point: [m] x, y coordinates in global frame.
@@ -308,9 +340,13 @@ class NuPlanMap(AbstractMap):
             return self._get_all_lane_connectors(point)
         else:
             layer_df = self._get_vector_map_layer(layer)
-            ids = layer_df.loc[layer_df.contains(geom.Point(point.x, point.y))]['fid'].tolist()
+            ids = layer_df.loc[layer_df.contains(geom.Point(
+                point.x, point.y))]['fid'].tolist()
 
-            return [self.get_map_object(map_object_id, layer) for map_object_id in ids]
+            return [
+                self.get_map_object(map_object_id, layer)
+                for map_object_id in ids
+            ]
 
     def _get_all_lane_connectors(self, point: Point2D) -> List[LaneConnector]:
         """
@@ -318,15 +354,19 @@ class NuPlanMap(AbstractMap):
         :param point: [m] x, y coordinates in global frame.
         :return: a list of lane connectors. An empty list if no lane connectors were found.
         """
-        lane_connectors_df = self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER)
-        ids = lane_connectors_df.loc[lane_connectors_df.contains(geom.Point(point.x, point.y))][
-            'lane_connector_fid'
-        ].tolist()
+        lane_connectors_df = self._load_vector_map_layer(
+            self._LANE_CONNECTOR_POLYGON_LAYER)
+        ids = lane_connectors_df.loc[lane_connectors_df.contains(
+            geom.Point(point.x, point.y))]['lane_connector_fid'].tolist()
         lane_connector_ids = list(map(str, ids))
 
-        return [self._get_lane_connector(lane_connector_id) for lane_connector_id in lane_connector_ids]
+        return [
+            self._get_lane_connector(lane_connector_id)
+            for lane_connector_id in lane_connector_ids
+        ]
 
-    def _get_proximity_map_object(self, patch: geom.Polygon, layer: SemanticMapLayer) -> List[MapObject]:
+    def _get_proximity_map_object(self, patch: geom.Polygon,
+                                  layer: SemanticMapLayer) -> List[MapObject]:
         """
         Gets nearby lanes within the given patch.
         :param patch: The area to be checked.
@@ -336,7 +376,10 @@ class NuPlanMap(AbstractMap):
         layer_df = self._get_vector_map_layer(layer)
         map_object_ids = layer_df[layer_df['geometry'].intersects(patch)]['fid']
 
-        return [self.get_map_object(map_object_id, layer) for map_object_id in map_object_ids]
+        return [
+            self.get_map_object(map_object_id, layer)
+            for map_object_id in map_object_ids
+        ]
 
     def _get_lane(self, lane_id: str) -> Lane:
         """
@@ -344,20 +387,17 @@ class NuPlanMap(AbstractMap):
         :param lane_id: Desired unique id of a lane that should be extracted.
         :return: Lane object.
         """
-        return (
-            NuPlanLane(
-                lane_id,
-                self._get_vector_map_layer(SemanticMapLayer.LANE),
-                self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR),
-                self._get_vector_map_layer(SemanticMapLayer.BASELINE_PATHS),
-                self._get_vector_map_layer(SemanticMapLayer.BOUNDARIES),
-                self._get_vector_map_layer(SemanticMapLayer.STOP_LINE),
-                self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER),
-                self,
-            )
-            if int(lane_id) in self._get_vector_map_layer(SemanticMapLayer.LANE)["lane_fid"].tolist()
-            else None
-        )
+        return (NuPlanLane(
+            lane_id,
+            self._get_vector_map_layer(SemanticMapLayer.LANE),
+            self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR),
+            self._get_vector_map_layer(SemanticMapLayer.BASELINE_PATHS),
+            self._get_vector_map_layer(SemanticMapLayer.BOUNDARIES),
+            self._get_vector_map_layer(SemanticMapLayer.STOP_LINE),
+            self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER),
+            self,
+        ) if int(lane_id) in self._get_vector_map_layer(
+            SemanticMapLayer.LANE)["lane_fid"].tolist() else None)
 
     def _get_lane_connector(self, lane_connector_id: str) -> LaneConnector:
         """
@@ -365,20 +405,17 @@ class NuPlanMap(AbstractMap):
         :param lane_connector_id: Desired unique id of a lane connector that should be extracted.
         :return: LaneConnector object.
         """
-        return (
-            NuPlanLaneConnector(
-                lane_connector_id,
-                self._get_vector_map_layer(SemanticMapLayer.LANE),
-                self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR),
-                self._get_vector_map_layer(SemanticMapLayer.BASELINE_PATHS),
-                self._get_vector_map_layer(SemanticMapLayer.BOUNDARIES),
-                self._get_vector_map_layer(SemanticMapLayer.STOP_LINE),
-                self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER),
-                self,
-            )
-            if lane_connector_id in self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR)["fid"].tolist()
-            else None
-        )
+        return (NuPlanLaneConnector(
+            lane_connector_id,
+            self._get_vector_map_layer(SemanticMapLayer.LANE),
+            self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR),
+            self._get_vector_map_layer(SemanticMapLayer.BASELINE_PATHS),
+            self._get_vector_map_layer(SemanticMapLayer.BOUNDARIES),
+            self._get_vector_map_layer(SemanticMapLayer.STOP_LINE),
+            self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER),
+            self,
+        ) if lane_connector_id in self._get_vector_map_layer(
+            SemanticMapLayer.LANE_CONNECTOR)["fid"].tolist() else None)
 
     def _get_roadblock(self, roadblock_id: str) -> RoadBlockGraphEdgeMapObject:
         """
@@ -386,48 +423,42 @@ class NuPlanMap(AbstractMap):
         :param roadblock_id: Desired unique id of a roadblock that should be extracted.
         :return: RoadBlock object.
         """
-        return (
-            NuPlanRoadBlock(
-                roadblock_id,
-                self._get_vector_map_layer(SemanticMapLayer.LANE),
-                self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR),
-                self._get_vector_map_layer(SemanticMapLayer.BASELINE_PATHS),
-                self._get_vector_map_layer(SemanticMapLayer.BOUNDARIES),
-                self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK),
-                self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK_CONNECTOR),
-                self._get_vector_map_layer(SemanticMapLayer.STOP_LINE),
-                self._get_vector_map_layer(SemanticMapLayer.INTERSECTION),
-                self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER),
-                self,
-            )
-            if roadblock_id in self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK)["fid"].tolist()
-            else None
-        )
+        return (NuPlanRoadBlock(
+            roadblock_id,
+            self._get_vector_map_layer(SemanticMapLayer.LANE),
+            self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR),
+            self._get_vector_map_layer(SemanticMapLayer.BASELINE_PATHS),
+            self._get_vector_map_layer(SemanticMapLayer.BOUNDARIES),
+            self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK),
+            self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK_CONNECTOR),
+            self._get_vector_map_layer(SemanticMapLayer.STOP_LINE),
+            self._get_vector_map_layer(SemanticMapLayer.INTERSECTION),
+            self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER),
+            self,
+        ) if roadblock_id in self._get_vector_map_layer(
+            SemanticMapLayer.ROADBLOCK)["fid"].tolist() else None)
 
-    def _get_roadblock_connector(self, roadblock_connector_id: str) -> RoadBlockGraphEdgeMapObject:
+    def _get_roadblock_connector(
+            self, roadblock_connector_id: str) -> RoadBlockGraphEdgeMapObject:
         """
         Gets the roadblock connector with the given roadblock_connector_id.
         :param roadblock_connector_id: Desired unique id of a roadblock connector that should be extracted.
         :return: RoadBlockConnector object.
         """
-        return (
-            NuPlanRoadBlockConnector(
-                roadblock_connector_id,
-                self._get_vector_map_layer(SemanticMapLayer.LANE),
-                self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR),
-                self._get_vector_map_layer(SemanticMapLayer.BASELINE_PATHS),
-                self._get_vector_map_layer(SemanticMapLayer.BOUNDARIES),
-                self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK),
-                self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK_CONNECTOR),
-                self._get_vector_map_layer(SemanticMapLayer.STOP_LINE),
-                self._get_vector_map_layer(SemanticMapLayer.INTERSECTION),
-                self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER),
-                self,
-            )
-            if roadblock_connector_id
-            in self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK_CONNECTOR)["fid"].tolist()
-            else None
-        )
+        return (NuPlanRoadBlockConnector(
+            roadblock_connector_id,
+            self._get_vector_map_layer(SemanticMapLayer.LANE),
+            self._get_vector_map_layer(SemanticMapLayer.LANE_CONNECTOR),
+            self._get_vector_map_layer(SemanticMapLayer.BASELINE_PATHS),
+            self._get_vector_map_layer(SemanticMapLayer.BOUNDARIES),
+            self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK),
+            self._get_vector_map_layer(SemanticMapLayer.ROADBLOCK_CONNECTOR),
+            self._get_vector_map_layer(SemanticMapLayer.STOP_LINE),
+            self._get_vector_map_layer(SemanticMapLayer.INTERSECTION),
+            self._load_vector_map_layer(self._LANE_CONNECTOR_POLYGON_LAYER),
+            self,
+        ) if roadblock_connector_id in self._get_vector_map_layer(
+            SemanticMapLayer.ROADBLOCK_CONNECTOR)["fid"].tolist() else None)
 
     def _initialize_drivable_area(self) -> None:
         """
@@ -436,11 +467,12 @@ class NuPlanMap(AbstractMap):
         """
         road_segments = self._load_vector_map_layer('road_segments')
         intersections = self._load_vector_map_layer('intersections')
-        generic_drivable_areas = self._load_vector_map_layer('generic_drivable_areas')
+        generic_drivable_areas = self._load_vector_map_layer(
+            'generic_drivable_areas')
         car_parks = self._load_vector_map_layer('carpark_areas')
         self._vector_map['drivable_area'] = pd.concat(
-            [road_segments, intersections, generic_drivable_areas, car_parks]
-        ).dropna(axis=1, how='any')
+            [road_segments, intersections, generic_drivable_areas,
+             car_parks]).dropna(axis=1, how='any')
 
     def _get_stop_line(self, stop_line_id: str) -> StopLine:
         """
@@ -448,11 +480,11 @@ class NuPlanMap(AbstractMap):
         :param stop_line_id: desired unique id of a stop line that should be extracted.
         :return: NuPlanStopLine object.
         """
-        return (
-            NuPlanStopLine(stop_line_id, self._get_vector_map_layer(SemanticMapLayer.STOP_LINE))
-            if stop_line_id in self._get_vector_map_layer(SemanticMapLayer.STOP_LINE)["fid"].tolist()
-            else None
-        )
+        return (NuPlanStopLine(
+            stop_line_id, self._get_vector_map_layer(
+                SemanticMapLayer.STOP_LINE))
+                if stop_line_id in self._get_vector_map_layer(
+                    SemanticMapLayer.STOP_LINE)["fid"].tolist() else None)
 
     def _get_crosswalk(self, crosswalk_id: str) -> NuPlanPolygonMapObject:
         """
@@ -460,11 +492,11 @@ class NuPlanMap(AbstractMap):
         :param crosswalk_id: desired unique id of a stop line that should be extracted.
         :return: NuPlanStopLine object.
         """
-        return (
-            NuPlanPolygonMapObject(crosswalk_id, self._get_vector_map_layer(SemanticMapLayer.CROSSWALK))
-            if crosswalk_id in self._get_vector_map_layer(SemanticMapLayer.CROSSWALK)["fid"].tolist()
-            else None
-        )
+        return (NuPlanPolygonMapObject(
+            crosswalk_id, self._get_vector_map_layer(
+                SemanticMapLayer.CROSSWALK))
+                if crosswalk_id in self._get_vector_map_layer(
+                    SemanticMapLayer.CROSSWALK)["fid"].tolist() else None)
 
     def _get_intersection(self, intersection_id: str) -> Intersection:
         """
@@ -472,11 +504,11 @@ class NuPlanMap(AbstractMap):
         :param intersection_id: desired unique id of a stop line that should be extracted.
         :return: NuPlanStopLine object.
         """
-        return (
-            NuPlanIntersection(intersection_id, self._get_vector_map_layer(SemanticMapLayer.INTERSECTION))
-            if intersection_id in self._get_vector_map_layer(SemanticMapLayer.INTERSECTION)["fid"].tolist()
-            else None
-        )
+        return (NuPlanIntersection(
+            intersection_id,
+            self._get_vector_map_layer(SemanticMapLayer.INTERSECTION))
+                if intersection_id in self._get_vector_map_layer(
+                    SemanticMapLayer.INTERSECTION)["fid"].tolist() else None)
 
     def _get_walkway(self, walkway_id: str) -> NuPlanPolygonMapObject:
         """
@@ -484,11 +516,10 @@ class NuPlanMap(AbstractMap):
         :param walkway_id: desired unique id of a walkway that should be extracted.
         :return: NuPlanPolygonMapObject object.
         """
-        return (
-            NuPlanPolygonMapObject(walkway_id, self._get_vector_map_layer(SemanticMapLayer.WALKWAYS))
-            if walkway_id in self._get_vector_map_layer(SemanticMapLayer.WALKWAYS)["fid"].tolist()
-            else None
-        )
+        return (NuPlanPolygonMapObject(
+            walkway_id, self._get_vector_map_layer(SemanticMapLayer.WALKWAYS))
+                if walkway_id in self._get_vector_map_layer(
+                    SemanticMapLayer.WALKWAYS)["fid"].tolist() else None)
 
     def _get_carpark_area(self, carpark_area_id: str) -> NuPlanPolygonMapObject:
         """
@@ -496,8 +527,8 @@ class NuPlanMap(AbstractMap):
         :param carpark_area_id: desired unique id of a car park that should be extracted.
         :return: NuPlanPolygonMapObject object.
         """
-        return (
-            NuPlanPolygonMapObject(carpark_area_id, self._get_vector_map_layer(SemanticMapLayer.CARPARK_AREA))
-            if carpark_area_id in self._get_vector_map_layer(SemanticMapLayer.CARPARK_AREA)["fid"].tolist()
-            else None
-        )
+        return (NuPlanPolygonMapObject(
+            carpark_area_id,
+            self._get_vector_map_layer(SemanticMapLayer.CARPARK_AREA))
+                if carpark_area_id in self._get_vector_map_layer(
+                    SemanticMapLayer.CARPARK_AREA)["fid"].tolist() else None)

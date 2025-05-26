@@ -119,7 +119,8 @@ class NuPlanScenario(AbstractScenario):
         #   The log file may not be downloaded.
         #
         # So, we must check and download the file here as well.
-        self._log_file = download_file_if_necessary(self._data_root, self._log_file_load_path)
+        self._log_file = download_file_if_necessary(self._data_root,
+                                                    self._log_file_load_path)
         self._log_name: str = absolute_path_to_log_name(self._log_file)
 
     def __reduce__(self) -> Tuple[Type[NuPlanScenario], Tuple[Any, ...]]:
@@ -163,8 +164,7 @@ class NuPlanScenario(AbstractScenario):
                 get_lidarpc_sensor_data(),
                 self._initial_lidar_timestamp,
                 self._scenario_extraction_info,
-            )
-        )
+            ))
 
         return cast(List[str], lidarpc_tokens)
 
@@ -174,7 +174,8 @@ class NuPlanScenario(AbstractScenario):
         return: Route roadblock ids extracted from expert trajectory.
         """
         expert_trajectory = list(self._extract_expert_trajectory())
-        return get_roadblock_ids_from_trajectory(self.map_api, expert_trajectory)  # type: ignore
+        return get_roadblock_ids_from_trajectory(
+            self.map_api, expert_trajectory)  # type: ignore
 
     @property
     def token(self) -> str:
@@ -226,36 +227,37 @@ class NuPlanScenario(AbstractScenario):
     def get_lidar_to_ego_transform(self) -> Transform:
         """Inherited, see superclass."""
         return get_sensor_transform_matrix_for_sensor_data_token_from_db(
-            self._log_file, get_lidarpc_sensor_data(), self._initial_lidar_token
-        )
+            self._log_file, get_lidarpc_sensor_data(),
+            self._initial_lidar_token)
 
     def get_mission_goal(self) -> Optional[StateSE2]:
         """Inherited, see superclass."""
         return get_mission_goal_for_sensor_data_token_from_db(
-            self._log_file, get_lidarpc_sensor_data(), self._initial_lidar_token
-        )
+            self._log_file, get_lidarpc_sensor_data(),
+            self._initial_lidar_token)
 
     def get_route_roadblock_ids(self) -> List[str]:
         """Inherited, see superclass."""
-        roadblock_ids = get_roadblock_ids_for_lidarpc_token_from_db(self._log_file, self._initial_lidar_token)
+        roadblock_ids = get_roadblock_ids_for_lidarpc_token_from_db(
+            self._log_file, self._initial_lidar_token)
         assert roadblock_ids is not None, "Unable to find Roadblock ids for current scenario"
         return cast(List[str], roadblock_ids)
 
     def get_expert_goal_state(self) -> StateSE2:
         """Inherited, see superclass."""
-        return get_statese2_for_lidarpc_token_from_db(self._log_file, self._lidarpc_tokens[-1])
+        return get_statese2_for_lidarpc_token_from_db(self._log_file,
+                                                      self._lidarpc_tokens[-1])
 
     def get_time_point(self, iteration: int) -> TimePoint:
         """Inherited, see superclass."""
-        return TimePoint(
-            time_us=get_sensor_data_token_timestamp_from_db(
-                self._log_file, get_lidarpc_sensor_data(), self._lidarpc_tokens[iteration]
-            )
-        )
+        return TimePoint(time_us=get_sensor_data_token_timestamp_from_db(
+            self._log_file, get_lidarpc_sensor_data(),
+            self._lidarpc_tokens[iteration]))
 
     def get_ego_state_at_iteration(self, iteration: int) -> EgoState:
         """Inherited, see superclass."""
-        return get_ego_state_for_lidarpc_token_from_db(self._log_file, self._lidarpc_tokens[iteration])
+        return get_ego_state_for_lidarpc_token_from_db(
+            self._log_file, self._lidarpc_tokens[iteration])
 
     def get_tracked_objects_at_iteration(
         self,
@@ -263,10 +265,11 @@ class NuPlanScenario(AbstractScenario):
         future_trajectory_sampling: Optional[TrajectorySampling] = None,
     ) -> DetectionsTracks:
         """Inherited, see superclass."""
-        assert 0 <= iteration < self.get_number_of_iterations(), f"Iteration is out of scenario: {iteration}!"
+        assert 0 <= iteration < self.get_number_of_iterations(
+        ), f"Iteration is out of scenario: {iteration}!"
         return DetectionsTracks(
-            extract_tracked_objects(self._lidarpc_tokens[iteration], self._log_file, future_trajectory_sampling)
-        )
+            extract_tracked_objects(self._lidarpc_tokens[iteration],
+                                    self._log_file, future_trajectory_sampling))
 
     def get_tracked_objects_within_time_window_at_iteration(
         self,
@@ -277,7 +280,8 @@ class NuPlanScenario(AbstractScenario):
         future_trajectory_sampling: Optional[TrajectorySampling] = None,
     ) -> DetectionsTracks:
         """Inherited, see superclass."""
-        assert 0 <= iteration < self.get_number_of_iterations(), f"Iteration is out of scenario: {iteration}!"
+        assert 0 <= iteration < self.get_number_of_iterations(
+        ), f"Iteration is out of scenario: {iteration}!"
         return DetectionsTracks(
             extract_tracked_objects_within_time_window(
                 self._lidarpc_tokens[iteration],
@@ -286,61 +290,85 @@ class NuPlanScenario(AbstractScenario):
                 future_time_horizon,
                 filter_track_tokens,
                 future_trajectory_sampling,
-            )
-        )
+            ))
 
-    def get_sensors_at_iteration(self, iteration: int, channels: Optional[List[SensorChannel]] = None) -> Sensors:
+    def get_sensors_at_iteration(
+            self,
+            iteration: int,
+            channels: Optional[List[SensorChannel]] = None) -> Sensors:
         """Inherited, see superclass."""
         # To maintain backwards compatibility. We return lidar_pc by default.
         channels = [LidarChannel.MERGED_PC] if channels is None else channels
 
         lidar_pc = next(
             get_sensor_data_from_sensor_data_tokens_from_db(
-                self._log_file, get_lidarpc_sensor_data(), LidarPc, [self._lidarpc_tokens[iteration]]
-            )
-        )
-        return self._get_sensor_data_from_lidar_pc(cast(LidarPc, lidar_pc), channels)
+                self._log_file, get_lidarpc_sensor_data(), LidarPc,
+                [self._lidarpc_tokens[iteration]]))
+        return self._get_sensor_data_from_lidar_pc(cast(LidarPc, lidar_pc),
+                                                   channels)
 
     def get_future_timestamps(
-        self, iteration: int, time_horizon: float, num_samples: Optional[int] = None
+            self,
+            iteration: int,
+            time_horizon: float,
+            num_samples: Optional[int] = None
     ) -> Generator[TimePoint, None, None]:
         """Inherited, see superclass."""
-        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples, time_horizon, True):
+        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples,
+                                                      time_horizon, True):
             yield TimePoint(lidar_pc.timestamp)
 
     def get_past_timestamps(
-        self, iteration: int, time_horizon: float, num_samples: Optional[int] = None
+            self,
+            iteration: int,
+            time_horizon: float,
+            num_samples: Optional[int] = None
     ) -> Generator[TimePoint, None, None]:
         """Inherited, see superclass."""
-        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples, time_horizon, False):
+        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples,
+                                                      time_horizon, False):
             yield TimePoint(lidar_pc.timestamp)
 
     def get_ego_past_trajectory(
-        self, iteration: int, time_horizon: float, num_samples: Optional[int] = None
+            self,
+            iteration: int,
+            time_horizon: float,
+            num_samples: Optional[int] = None
     ) -> Generator[EgoState, None, None]:
         """Inherited, see superclass."""
-        num_samples = num_samples if num_samples else int(time_horizon / self.database_interval)
-        indices = sample_indices_with_time_horizon(num_samples, time_horizon, self._database_row_interval)
+        num_samples = num_samples if num_samples else int(
+            time_horizon / self.database_interval)
+        indices = sample_indices_with_time_horizon(num_samples, time_horizon,
+                                                   self._database_row_interval)
 
         return cast(
             Generator[EgoState, None, None],
-            get_sampled_ego_states_from_db(
-                self._log_file, self._lidarpc_tokens[iteration], get_lidarpc_sensor_data(), indices, future=False
-            ),
+            get_sampled_ego_states_from_db(self._log_file,
+                                           self._lidarpc_tokens[iteration],
+                                           get_lidarpc_sensor_data(),
+                                           indices,
+                                           future=False),
         )
 
     def get_ego_future_trajectory(
-        self, iteration: int, time_horizon: float, num_samples: Optional[int] = None
+            self,
+            iteration: int,
+            time_horizon: float,
+            num_samples: Optional[int] = None
     ) -> Generator[EgoState, None, None]:
         """Inherited, see superclass."""
-        num_samples = num_samples if num_samples else int(time_horizon / self.database_interval)
-        indices = sample_indices_with_time_horizon(num_samples, time_horizon, self._database_row_interval)
+        num_samples = num_samples if num_samples else int(
+            time_horizon / self.database_interval)
+        indices = sample_indices_with_time_horizon(num_samples, time_horizon,
+                                                   self._database_row_interval)
 
         return cast(
             Generator[EgoState, None, None],
-            get_sampled_ego_states_from_db(
-                self._log_file, self._lidarpc_tokens[iteration], get_lidarpc_sensor_data(), indices, future=True
-            ),
+            get_sampled_ego_states_from_db(self._log_file,
+                                           self._lidarpc_tokens[iteration],
+                                           get_lidarpc_sensor_data(),
+                                           indices,
+                                           future=True),
         )
 
     def get_past_tracked_objects(
@@ -352,8 +380,11 @@ class NuPlanScenario(AbstractScenario):
     ) -> Generator[DetectionsTracks, None, None]:
         """Inherited, see superclass."""
         # TODO: This can be made even more efficient with a batch query
-        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples, time_horizon, False):
-            yield DetectionsTracks(extract_tracked_objects(lidar_pc.token, self._log_file, future_trajectory_sampling))
+        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples,
+                                                      time_horizon, False):
+            yield DetectionsTracks(
+                extract_tracked_objects(lidar_pc.token, self._log_file,
+                                        future_trajectory_sampling))
 
     def get_future_tracked_objects(
         self,
@@ -364,8 +395,11 @@ class NuPlanScenario(AbstractScenario):
     ) -> Generator[DetectionsTracks, None, None]:
         """Inherited, see superclass."""
         # TODO: This can be made even more efficient with a batch query
-        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples, time_horizon, True):
-            yield DetectionsTracks(extract_tracked_objects(lidar_pc.token, self._log_file, future_trajectory_sampling))
+        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples,
+                                                      time_horizon, True):
+            yield DetectionsTracks(
+                extract_tracked_objects(lidar_pc.token, self._log_file,
+                                        future_trajectory_sampling))
 
     def get_past_sensors(
         self,
@@ -378,20 +412,27 @@ class NuPlanScenario(AbstractScenario):
         # To maintain backwards compatibility. We return lidar_pc by default.
         channels = [LidarChannel.MERGED_PC] if channels is None else channels
 
-        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples, time_horizon, False):
+        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples,
+                                                      time_horizon, False):
             yield self._get_sensor_data_from_lidar_pc(lidar_pc, channels)
 
-    def get_traffic_light_status_at_iteration(self, iteration: int) -> Generator[TrafficLightStatusData, None, None]:
+    def get_traffic_light_status_at_iteration(
+            self,
+            iteration: int) -> Generator[TrafficLightStatusData, None, None]:
         """Inherited, see superclass."""
         token = self._lidarpc_tokens[iteration]
 
         return cast(
             Generator[TrafficLightStatusData, None, None],
-            get_traffic_light_status_for_lidarpc_token_from_db(self._log_file, token),
+            get_traffic_light_status_for_lidarpc_token_from_db(
+                self._log_file, token),
         )
 
     def get_past_traffic_light_status_history(
-        self, iteration: int, time_horizon: float, num_samples: Optional[int] = None
+        self,
+        iteration: int,
+        time_horizon: float,
+        num_samples: Optional[int] = None
     ) -> Generator[TrafficLightStatuses, None, None]:
         """
         Gets past traffic light status.
@@ -401,13 +442,18 @@ class NuPlanScenario(AbstractScenario):
         :param num_samples: number of entries in the future, if None it will be deduced from the DB.
         :return: Generator object for traffic light history to the past.
         """
-        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples, time_horizon, False):
+        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples,
+                                                      time_horizon, False):
             yield TrafficLightStatuses(
-                list(get_traffic_light_status_for_lidarpc_token_from_db(self._log_file, lidar_pc.token))
-            )
+                list(
+                    get_traffic_light_status_for_lidarpc_token_from_db(
+                        self._log_file, lidar_pc.token)))
 
     def get_future_traffic_light_status_history(
-        self, iteration: int, time_horizon: float, num_samples: Optional[int] = None
+        self,
+        iteration: int,
+        time_horizon: float,
+        num_samples: Optional[int] = None
     ) -> Generator[TrafficLightStatuses, None, None]:
         """
         Gets future traffic light status.
@@ -417,18 +463,21 @@ class NuPlanScenario(AbstractScenario):
         :param num_samples: number of entries in the future, if None it will be deduced from the DB.
         :return: Generator object for traffic light history to the future.
         """
-        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples, time_horizon, True):
+        for lidar_pc in self._find_matching_lidar_pcs(iteration, num_samples,
+                                                      time_horizon, True):
             yield TrafficLightStatuses(
-                list(get_traffic_light_status_for_lidarpc_token_from_db(self._log_file, lidar_pc.token))
-            )
+                list(
+                    get_traffic_light_status_for_lidarpc_token_from_db(
+                        self._log_file, lidar_pc.token)))
 
     def get_scenario_tokens(self) -> List[str]:
         """Return the list of lidarpc tokens from the DB that are contained in the scenario."""
         return self._lidarpc_tokens
 
     def _find_matching_lidar_pcs(
-        self, iteration: int, num_samples: Optional[int], time_horizon: float, look_into_future: bool
-    ) -> Generator[LidarPc, None, None]:
+            self, iteration: int, num_samples: Optional[int],
+            time_horizon: float,
+            look_into_future: bool) -> Generator[LidarPc, None, None]:
         """
         Find the best matching lidar_pcs to the desired samples and time horizon
         :param iteration: iteration within scenario 0 <= scenario_iteration < get_number_of_iterations
@@ -437,17 +486,22 @@ class NuPlanScenario(AbstractScenario):
         :param look_into_future: if True, we will iterate into next lidar_pc otherwise we will iterate through prev
         :return: lidar_pcs matching to database indices
         """
-        num_samples = num_samples if num_samples else int(time_horizon / self.database_interval)
-        indices = sample_indices_with_time_horizon(num_samples, time_horizon, self._database_row_interval)
+        num_samples = num_samples if num_samples else int(
+            time_horizon / self.database_interval)
+        indices = sample_indices_with_time_horizon(num_samples, time_horizon,
+                                                   self._database_row_interval)
 
         return cast(
             Generator[LidarPc, None, None],
-            get_sampled_lidarpcs_from_db(
-                self._log_file, self._lidarpc_tokens[iteration], get_lidarpc_sensor_data(), indices, look_into_future
-            ),
+            get_sampled_lidarpcs_from_db(self._log_file,
+                                         self._lidarpc_tokens[iteration],
+                                         get_lidarpc_sensor_data(), indices,
+                                         look_into_future),
         )
 
-    def _extract_expert_trajectory(self, max_future_seconds: int = 60) -> Generator[EgoState, None, None]:
+    def _extract_expert_trajectory(
+            self,
+            max_future_seconds: int = 60) -> Generator[EgoState, None, None]:
         """
         Extract expert trajectory with specified time parameters. If initial lidar pc does not have enough history/future
             only available time will be extracted
@@ -457,8 +511,11 @@ class NuPlanScenario(AbstractScenario):
         minimal_required_future_time_available = 0.5
 
         # Extract Future
-        end_log_time_us = get_end_sensor_time_from_db(self._log_file, get_lidarpc_sensor_data())
-        max_future_time = min((end_log_time_us - self._initial_lidar_timestamp) * 1e-6, max_future_seconds)
+        end_log_time_us = get_end_sensor_time_from_db(self._log_file,
+                                                      get_lidarpc_sensor_data())
+        max_future_time = min(
+            (end_log_time_us - self._initial_lidar_timestamp) * 1e-6,
+            max_future_seconds)
 
         if max_future_time < minimal_required_future_time_available:
             return
@@ -466,7 +523,8 @@ class NuPlanScenario(AbstractScenario):
         for traj in self.get_ego_future_trajectory(0, max_future_time):
             yield traj
 
-    def _create_blob_store_if_needed(self) -> Tuple[LocalStore, Optional[S3Store]]:
+    def _create_blob_store_if_needed(
+            self) -> Tuple[LocalStore, Optional[S3Store]]:
         """
         A convenience method that creates the blob stores if it's not already created.
         :return: The created or cached LocalStore and S3Store objects.
@@ -475,16 +533,20 @@ class NuPlanScenario(AbstractScenario):
             return self._local_store, self._remote_store
 
         if self._sensor_root is None:
-            raise ValueError("sensor_root is not set. Please set the sensor_root to access sensor data.")
+            raise ValueError(
+                "sensor_root is not set. Please set the sensor_root to access sensor data."
+            )
         Path(self._sensor_root).mkdir(exist_ok=True)
         self._local_store = LocalStore(self._sensor_root)
         if os.getenv("NUPLAN_DATA_STORE", "") == "s3":
             s3_url = os.getenv("NUPLAN_DATA_ROOT_S3_URL", "")
-            self._remote_store = S3Store(os.path.join(s3_url, "sensor_blobs"), show_progress=True)
+            self._remote_store = S3Store(os.path.join(s3_url, "sensor_blobs"),
+                                         show_progress=True)
 
         return self._local_store, self._remote_store
 
-    def _get_sensor_data_from_lidar_pc(self, lidar_pc: LidarPc, channels: List[SensorChannel]) -> Sensors:
+    def _get_sensor_data_from_lidar_pc(
+            self, lidar_pc: LidarPc, channels: List[SensorChannel]) -> Sensors:
         """
         Loads Sensor data given a database LidarPC object.
         :param lidar_pc: The lidar_pc for which to grab the point cloud.
@@ -494,16 +556,18 @@ class NuPlanScenario(AbstractScenario):
         local_store, remote_store = self._create_blob_store_if_needed()
 
         retrieved_images = get_images_from_lidar_tokens(
-            self._log_file, [lidar_pc.token], [cast(str, channel.value) for channel in channels]
-        )
-        lidar_pcs = (
-            {LidarChannel.MERGED_PC: load_point_cloud(cast(LidarPc, lidar_pc), local_store, remote_store)}
-            if LidarChannel.MERGED_PC in channels
-            else None
-        )
+            self._log_file, [lidar_pc.token],
+            [cast(str, channel.value) for channel in channels])
+        lidar_pcs = ({
+            LidarChannel.MERGED_PC:
+                load_point_cloud(cast(LidarPc, lidar_pc), local_store,
+                                 remote_store)
+        } if LidarChannel.MERGED_PC in channels else None)
 
         images = {
-            CameraChannel[image.channel]: load_image(image, local_store, remote_store) for image in retrieved_images
+            CameraChannel[image.channel]:
+                load_image(image, local_store, remote_store)
+            for image in retrieved_images
         }
 
         return Sensors(pointcloud=lidar_pcs, images=images if images else None)

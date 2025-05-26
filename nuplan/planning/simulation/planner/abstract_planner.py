@@ -35,7 +35,8 @@ class PlannerInput:
 
     iteration: SimulationIteration  # Iteration and time in a simulation progress
     history: SimulationHistoryBuffer  # Rolling buffer containing past observations and states.
-    traffic_light_data: Optional[List[TrafficLightStatusData]] = None  # The traffic light status data
+    traffic_light_data: Optional[
+        List[TrafficLightStatusData]] = None  # The traffic light status data
 
 
 class AbstractPlanner(abc.ABC):
@@ -81,7 +82,8 @@ class AbstractPlanner(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def compute_planner_trajectory(self, current_input: PlannerInput) -> AbstractTrajectory:
+    def compute_planner_trajectory(
+            self, current_input: PlannerInput) -> AbstractTrajectory:
         """
         Computes the ego vehicle trajectory.
         :param current_input: List of planner inputs for which trajectory needs to be computed.
@@ -89,7 +91,8 @@ class AbstractPlanner(abc.ABC):
         """
         pass
 
-    def compute_trajectory(self, current_input: PlannerInput) -> AbstractTrajectory:
+    def compute_trajectory(self,
+                           current_input: PlannerInput) -> AbstractTrajectory:
         """
         Computes the ego vehicle trajectory, where we check that if planner can not consume batched inputs,
             we require that the input list has exactly one element
@@ -104,20 +107,24 @@ class AbstractPlanner(abc.ABC):
         try:
             trajectory = self.compute_planner_trajectory(current_input)
         except Exception as e:
-            self._compute_trajectory_runtimes.append(time.perf_counter() - start_time)
+            self._compute_trajectory_runtimes.append(time.perf_counter() -
+                                                     start_time)
             raise e
 
-        self._compute_trajectory_runtimes.append(time.perf_counter() - start_time)
+        self._compute_trajectory_runtimes.append(time.perf_counter() -
+                                                 start_time)
         return trajectory
 
-    def generate_planner_report(self, clear_stats: bool = True) -> PlannerReport:
+    def generate_planner_report(self,
+                                clear_stats: bool = True) -> PlannerReport:
         """
         Generate a report containing runtime stats from the planner.
         By default, returns a report containing the time-series of compute_trajectory runtimes.
         :param clear_stats: whether or not to clear stored stats after creating report.
         :return: report containing planner runtime stats.
         """
-        report = PlannerReport(compute_trajectory_runtimes=self._compute_trajectory_runtimes)
+        report = PlannerReport(
+            compute_trajectory_runtimes=self._compute_trajectory_runtimes)
         if clear_stats:
             self._compute_trajectory_runtimes: List[float] = []
         return report

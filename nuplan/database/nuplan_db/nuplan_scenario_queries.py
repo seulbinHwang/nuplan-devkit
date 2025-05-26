@@ -34,7 +34,10 @@ def _parse_tracked_object_row(row: sqlite3.Row) -> TrackedObject:
     """
     category_name = row["category_name"]
     pose = StateSE2(row["x"], row["y"], row["yaw"])
-    oriented_box = OrientedBox(pose, width=row["width"], length=row["length"], height=row["height"])
+    oriented_box = OrientedBox(pose,
+                               width=row["width"],
+                               length=row["length"],
+                               height=row["height"])
 
     # These next two are globals
     label_local = raw_mapping["global2local"][category_name]
@@ -50,7 +53,8 @@ def _parse_tracked_object_row(row: sqlite3.Row) -> TrackedObject:
             metadata=SceneObjectMetadata(
                 token=row["token"].hex(),
                 track_token=row["track_token"].hex(),
-                track_id=get_unique_incremental_track_id(str(row["track_token"].hex())),
+                track_id=get_unique_incremental_track_id(
+                    str(row["track_token"].hex())),
                 timestamp_us=row["timestamp"],
                 category_name=category_name,
             ),
@@ -62,14 +66,17 @@ def _parse_tracked_object_row(row: sqlite3.Row) -> TrackedObject:
             metadata=SceneObjectMetadata(
                 token=row["token"].hex(),
                 track_token=row["track_token"].hex(),
-                track_id=get_unique_incremental_track_id(str(row["track_token"].hex())),
+                track_id=get_unique_incremental_track_id(
+                    str(row["track_token"].hex())),
                 timestamp_us=row["timestamp"],
                 category_name=category_name,
             ),
         )
 
 
-def get_sensor_token_by_index_from_db(log_file: str, sensor_source: SensorDataSource, index: int) -> Optional[str]:
+def get_sensor_token_by_index_from_db(log_file: str,
+                                      sensor_source: SensorDataSource,
+                                      index: int) -> Optional[str]:
     """
     Get the N-th sensor token ordered chronologically by timestamp from a particular channel.
     This is primarily used for unit testing.
@@ -82,8 +89,11 @@ def get_sensor_token_by_index_from_db(log_file: str, sensor_source: SensorDataSo
     :return: The token, if it exists.
     """
     if index < 0:
-        raise ValueError(f"Index of {index} was supplied to get_lidarpc_token_by_index_from_db(), which is negative.")
-    sensor_token = get_sensor_token(log_file, sensor_source.sensor_table, sensor_source.channel)
+        raise ValueError(
+            f"Index of {index} was supplied to get_lidarpc_token_by_index_from_db(), which is negative."
+        )
+    sensor_token = get_sensor_token(log_file, sensor_source.sensor_table,
+                                    sensor_source.channel)
 
     query = f"""
     WITH ordered AS
@@ -99,11 +109,13 @@ def get_sensor_token_by_index_from_db(log_file: str, sensor_source: SensorDataSo
         AND {sensor_source.sensor_token_column} = ?;
     """
 
-    result = execute_one(query, [index, bytearray.fromhex(sensor_token)], log_file)
+    result = execute_one(query, [index, bytearray.fromhex(sensor_token)],
+                         log_file)
     return None if result is None else str(result["token"].hex())
 
 
-def get_end_sensor_time_from_db(log_file: str, sensor_source: SensorDataSource) -> int:
+def get_end_sensor_time_from_db(log_file: str,
+                                sensor_source: SensorDataSource) -> int:
     """
     Get the timestamp of the last sensor data recorded in the log file.
     :param log_file: The db file to query.
@@ -119,9 +131,9 @@ def get_end_sensor_time_from_db(log_file: str, sensor_source: SensorDataSource) 
     return int(result["max_time"])
 
 
-def get_sensor_data_token_timestamp_from_db(
-    log_file: str, sensor_source: SensorDataSource, token: str
-) -> Optional[int]:
+def get_sensor_data_token_timestamp_from_db(log_file: str,
+                                            sensor_source: SensorDataSource,
+                                            token: str) -> Optional[int]:
     """
     Get the timestamp associated with an individual lidar_pc token.
     :param log_file: The db file to query.
@@ -138,7 +150,9 @@ def get_sensor_data_token_timestamp_from_db(
     return None if result is None else int(result["timestamp"])
 
 
-def get_sensor_token_map_name_from_db(log_file: str, sensor_source: SensorDataSource, token: str) -> Optional[str]:
+def get_sensor_token_map_name_from_db(log_file: str,
+                                      sensor_source: SensorDataSource,
+                                      token: str) -> Optional[str]:
     """
     Get the map name for a provided sensor token.
     :param log_file: The db file to query.
@@ -161,8 +175,9 @@ def get_sensor_token_map_name_from_db(log_file: str, sensor_source: SensorDataSo
 
 
 def get_sampled_sensor_tokens_in_time_window_from_db(
-    log_file: str, sensor_source: SensorDataSource, start_timestamp: int, end_timestamp: int, subsample_interval: int
-) -> Generator[str, None, None]:
+        log_file: str, sensor_source: SensorDataSource, start_timestamp: int,
+        end_timestamp: int,
+        subsample_interval: int) -> Generator[str, None, None]:
     """
     For every token in a window defined by [start_timestamp, end_timestamp], retrieve every `subsample_interval`-th sensor token, ordered in increasing order by timestamp.
 
@@ -189,7 +204,8 @@ def get_sampled_sensor_tokens_in_time_window_from_db(
     :param subsample_interval: The interval at which to sample.
     :return: A generator of lidar_pc tokens that fit the provided parameters.
     """
-    sensor_token = get_sensor_token(log_file, sensor_source.sensor_table, sensor_source.channel)
+    sensor_token = get_sensor_token(log_file, sensor_source.sensor_table,
+                                    sensor_source.channel)
 
     query = f"""
     WITH numbered AS
@@ -206,8 +222,9 @@ def get_sampled_sensor_tokens_in_time_window_from_db(
     ORDER BY timestamp ASC;
     """
     for row in execute_many(
-        query, (start_timestamp, end_timestamp, bytearray.fromhex(sensor_token), subsample_interval), log_file
-    ):
+            query, (start_timestamp, end_timestamp,
+                    bytearray.fromhex(sensor_token), subsample_interval),
+            log_file):
         yield row["token"].hex()
 
 
@@ -235,13 +252,14 @@ def get_sensor_data_from_sensor_data_tokens_from_db(
         WHERE token IN ({('?,'*len(tokens))[:-1]});
     """
 
-    for row in execute_many(query, [bytearray.fromhex(t) for t in tokens], log_file):
+    for row in execute_many(query, [bytearray.fromhex(t) for t in tokens],
+                            log_file):
         yield sensor_class.from_db_row(row)
 
 
 def get_sensor_transform_matrix_for_sensor_data_token_from_db(
-    log_file: str, sensor_source: SensorDataSource, sensor_data_token: str
-) -> Optional[Transform]:
+        log_file: str, sensor_source: SensorDataSource,
+        sensor_data_token: str) -> Optional[Transform]:
     """
     Get the associated lidar transform matrix from the DB for the given lidarpc_token.
     :param log_file: The log file to query.
@@ -272,8 +290,8 @@ def get_sensor_transform_matrix_for_sensor_data_token_from_db(
 
 
 def get_mission_goal_for_sensor_data_token_from_db(
-    log_file: str, sensor_source: SensorDataSource, token: str
-) -> Optional[StateSE2]:
+        log_file: str, sensor_source: SensorDataSource,
+        token: str) -> Optional[StateSE2]:
     """
     Get the goal pose for a given lidar_pc token.
     :param log_file: The db file to query.
@@ -304,7 +322,8 @@ def get_mission_goal_for_sensor_data_token_from_db(
     return StateSE2(row["x"], row["y"], q.yaw_pitch_roll[0])
 
 
-def get_roadblock_ids_for_lidarpc_token_from_db(log_file: str, lidarpc_token: str) -> Optional[List[str]]:
+def get_roadblock_ids_for_lidarpc_token_from_db(
+        log_file: str, lidarpc_token: str) -> Optional[List[str]]:
     """
     Get the scene roadblock ids from the db for a given lidar_pc token.
     :param log_file: The db file to query.
@@ -325,7 +344,8 @@ def get_roadblock_ids_for_lidarpc_token_from_db(log_file: str, lidarpc_token: st
     return str(row["roadblock_ids"]).split(" ")
 
 
-def get_statese2_for_lidarpc_token_from_db(log_file: str, token: str) -> Optional[StateSE2]:
+def get_statese2_for_lidarpc_token_from_db(log_file: str,
+                                           token: str) -> Optional[StateSE2]:
     """
     Get the ego pose as a StateSE2 from the db for a given lidar_pc token.
     :param log_file: The db file to query.
@@ -398,7 +418,8 @@ def get_sampled_lidarpcs_from_db(
     if not isinstance(sample_indexes, list):
         sample_indexes = list(sample_indexes)
 
-    sensor_token = get_sensor_token(log_file, sensor_source.sensor_table, sensor_source.channel)
+    sensor_token = get_sensor_token(log_file, sensor_source.sensor_table,
+                                    sensor_source.channel)
 
     order_direction = "ASC" if future else "DESC"
     order_cmp = ">=" if future else "<="
@@ -442,7 +463,8 @@ def get_sampled_lidarpcs_from_db(
         ORDER BY timestamp ASC;
     """
 
-    args = [bytearray.fromhex(initial_token), bytearray.fromhex(sensor_token)] + sample_indexes  # type: ignore
+    args = [bytearray.fromhex(initial_token),
+            bytearray.fromhex(sensor_token)] + sample_indexes  # type: ignore
     for row in execute_many(query, args, log_file):
         yield LidarPc.from_db_row(row)
 
@@ -491,7 +513,8 @@ def get_sampled_ego_states_from_db(
     if not isinstance(sample_indexes, list):
         sample_indexes = list(sample_indexes)
 
-    sensor_token = get_sensor_token(log_file, sensor_source.sensor_table, sensor_source.channel)
+    sensor_token = get_sensor_token(log_file, sensor_source.sensor_table,
+                                    sensor_source.channel)
 
     order_direction = "ASC" if future else "DESC"
     order_cmp = ">=" if future else "<="
@@ -543,7 +566,8 @@ def get_sampled_ego_states_from_db(
         ORDER BY o.timestamp ASC;
     """
 
-    args = [bytearray.fromhex(initial_token), bytearray.fromhex(sensor_token)] + sample_indexes  # type: ignore
+    args = [bytearray.fromhex(initial_token),
+            bytearray.fromhex(sensor_token)] + sample_indexes  # type: ignore
     for row in execute_many(query, args, log_file):
         q = Quaternion(row["qw"], row["qx"], row["qy"], row["qz"])
         yield EgoState.build_from_rear_axle(
@@ -552,11 +576,13 @@ def get_sampled_ego_states_from_db(
             vehicle_parameters=get_pacifica_parameters(),
             time_point=TimePoint(row["timestamp"]),
             rear_axle_velocity_2d=StateVector2D(row["vx"], y=row["vy"]),
-            rear_axle_acceleration_2d=StateVector2D(x=row["acceleration_x"], y=row["acceleration_y"]),
+            rear_axle_acceleration_2d=StateVector2D(x=row["acceleration_x"],
+                                                    y=row["acceleration_y"]),
         )
 
 
-def get_ego_state_for_lidarpc_token_from_db(log_file: str, token: str) -> EgoState:
+def get_ego_state_for_lidarpc_token_from_db(log_file: str,
+                                            token: str) -> EgoState:
     """
     Get the ego state associated with an individual lidar_pc token from the db.
 
@@ -595,13 +621,14 @@ def get_ego_state_for_lidarpc_token_from_db(log_file: str, token: str) -> EgoSta
         vehicle_parameters=get_pacifica_parameters(),
         time_point=TimePoint(row["timestamp"]),
         rear_axle_velocity_2d=StateVector2D(row["vx"], y=row["vy"]),
-        rear_axle_acceleration_2d=StateVector2D(x=row["acceleration_x"], y=row["acceleration_y"]),
+        rear_axle_acceleration_2d=StateVector2D(x=row["acceleration_x"],
+                                                y=row["acceleration_y"]),
     )
 
 
 def get_traffic_light_status_for_lidarpc_token_from_db(
-    log_file: str, token: str
-) -> Generator[TrafficLightStatusData, None, None]:
+        log_file: str,
+        token: str) -> Generator[TrafficLightStatusData, None, None]:
     """
     Get the traffic light information associated with a given lidar_pc.
     :param log_file: The log file to query.
@@ -631,7 +658,10 @@ def get_traffic_light_status_for_lidarpc_token_from_db(
 
 
 def get_tracked_objects_within_time_interval_from_db(
-    log_file: str, start_timestamp: int, end_timestamp: int, filter_track_tokens: Optional[Set[str]] = None
+    log_file: str,
+    start_timestamp: int,
+    end_timestamp: int,
+    filter_track_tokens: Optional[Set[str]] = None
 ) -> Generator[TrackedObject, None, None]:
     """
     Gets all of the tracked objects between the provided timestamps, inclusive.
@@ -688,7 +718,8 @@ def get_tracked_objects_within_time_interval_from_db(
         yield _parse_tracked_object_row(row)
 
 
-def get_tracked_objects_for_lidarpc_token_from_db(log_file: str, token: str) -> Generator[TrackedObject, None, None]:
+def get_tracked_objects_for_lidarpc_token_from_db(
+        log_file: str, token: str) -> Generator[TrackedObject, None, None]:
     """
     Get all tracked objects for a given lidar_pc.
     This includes both agents and static objects.
@@ -731,8 +762,9 @@ def get_tracked_objects_for_lidarpc_token_from_db(log_file: str, token: str) -> 
 
 
 def get_future_waypoints_for_agents_from_db(
-    log_file: str, track_tokens: Union[Generator[str, None, None], List[str]], start_timestamp: int, end_timestamp: int
-) -> Generator[Tuple[str, Waypoint], None, None]:
+        log_file: str, track_tokens: Union[Generator[str, None, None],
+                                           List[str]], start_timestamp: int,
+        end_timestamp: int) -> Generator[Tuple[str, Waypoint], None, None]:
     """
     Obtain the future waypoints for the selected agents from the DB in the provided time window.
     Results are sorted by track token, then by timestamp in ascending order.
@@ -768,14 +800,19 @@ def get_future_waypoints_for_agents_from_db(
         ORDER BY lb.track_token ASC, lp.timestamp ASC;
     """
 
-    args = [start_timestamp, end_timestamp] + [bytearray.fromhex(t) for t in track_tokens]  # type: ignore
+    args = [start_timestamp, end_timestamp
+           ] + [bytearray.fromhex(t) for t in track_tokens]  # type: ignore
 
     for row in execute_many(query, args, log_file):
         pose = StateSE2(row["x"], row["y"], row["yaw"])
-        oriented_box = OrientedBox(pose, width=row["width"], height=row["height"], length=row["length"])
+        oriented_box = OrientedBox(pose,
+                                   width=row["width"],
+                                   height=row["height"],
+                                   length=row["length"])
         velocity = StateVector2D(row["vx"], row["vy"])
 
-        yield (row["track_token"].hex(), Waypoint(TimePoint(row["timestamp"]), oriented_box, velocity))
+        yield (row["track_token"].hex(),
+               Waypoint(TimePoint(row["timestamp"]), oriented_box, velocity))
 
 
 def get_scenarios_from_db(
@@ -810,27 +847,21 @@ def get_scenarios_from_db(
     filter_clauses = []
     args: List[Union[str, bytearray]] = []
     if filter_types is not None:
-        filter_clauses.append(
-            f"""
+        filter_clauses.append(f"""
         st.type IN ({('?,'*len(filter_types))[:-1]})
-        """
-        )
+        """)
         args += filter_types
 
     if filter_tokens is not None:
-        filter_clauses.append(
-            f"""
+        filter_clauses.append(f"""
         lp.token IN ({('?,'*len(filter_tokens))[:-1]})
-        """
-        )
+        """)
         args += [bytearray.fromhex(t) for t in filter_tokens]
 
     if filter_map_names is not None:
-        filter_clauses.append(
-            f"""
+        filter_clauses.append(f"""
         l.map_version IN ({('?,'*len(filter_map_names))[:-1]})
-        """
-        )
+        """)
         args += filter_map_names
 
     if len(filter_clauses) > 0:
@@ -908,7 +939,8 @@ def get_scenarios_from_db(
         yield row
 
 
-def get_lidarpc_tokens_with_scenario_tag_from_db(log_file: str) -> Generator[Tuple[str, str], None, None]:
+def get_lidarpc_tokens_with_scenario_tag_from_db(
+        log_file: str) -> Generator[Tuple[str, str], None, None]:
     """
     Get the LidarPc tokens that are tagged with a scenario from the DB, sorted by scenario_type in ascending order.
     :param log_file: The log file to query.
