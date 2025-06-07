@@ -128,9 +128,6 @@ class NuPlanScenarioBuilder(AbstractScenarioBuilder):
     def _create_scenarios(self, scenario_filter: ScenarioFilter, worker: WorkerPool) -> ScenarioDict:
         """
         Creates a scenario dictionary with scenario type as key and list of scenarios for each type.
-        :param scenario_filter: Structure that contains scenario filtering instructions.
-        :param worker: Worker pool for concurrent scenario processing.
-        :return: Constructed scenario dictionary.
         """
         allowable_log_names = set(scenario_filter.log_names) if scenario_filter.log_names is not None else None
         map_parameters = [
@@ -154,16 +151,26 @@ class NuPlanScenarioBuilder(AbstractScenarioBuilder):
             if (allowable_log_names is None) or (absolute_path_to_log_name(log_file) in allowable_log_names)
         ]
 
-        if len(map_parameters) == 0:
+        if not map_parameters:
             logger.warning(
-                "No log files found! This may mean that you need to set your environment, "
-                "or that all of your log files got filtered out on this worker."
+                "No log files found! This may mean that all logs were filtered out."
             )
             return {}
 
-        dicts = worker_map(worker, get_scenarios_from_log_file, map_parameters)
+        # ── 여기부터 변경된 부분 ──
+        from tqdm import tqdm
+        dicts = []
+        # worker_map 대신 futures 리스트를 받아와 tqdm으로 한 개씩 처리 상태 표시
+        futures = worker_map(worker, get_scenarios_from_log_file, map_parameters)
+        for d in tqdm(futures,
+                      total=len(map_parameters),
+                      desc="Loading scenarios",
+                      unit="db"):
+            dicts.append(d)
+        # ── 변경 끝 ──
 
         return self._aggregate_dicts(dicts)
+
 
     def _create_filter_wrappers(self, scenario_filter: ScenarioFilter, worker: WorkerPool) -> List[FilterWrapper]:
         """
@@ -250,16 +257,26 @@ class NuPlanScenarioBuilder(AbstractScenarioBuilder):
         return filters
 
     def get_scenarios(self, scenario_filter: ScenarioFilter, worker: WorkerPool) -> List[AbstractScenario]:
-        """Implemented. See interface."""
-        # Create scenario dictionary and series of filters to apply
+        """
+        Build and filter scenarios, then return as a list.
+        """
+        # 1) 시나리오 생성
         scenario_dict = self._create_scenarios(scenario_filter, worker)
+
+        # 2) 필터 리스트 생성
         filter_wrappers = self._create_filter_wrappers(scenario_filter, worker)
 
-        # Apply filtering strategy sequentially to the scenario dictionary
-        for filter_wrapper in filter_wrappers:
+        # ── 여기부터 변경된 부분 ──
+        from tqdm import tqdm
+        for filter_wrapper in tqdm(filter_wrappers,
+                                   desc="Applying filters",
+                                   unit="step"):
             scenario_dict = filter_wrapper.run(scenario_dict)
+        # ── 변경 끝 ──
 
-        return scenario_dict_to_list(scenario_dict, shuffle=scenario_filter.shuffle)  # type: ignore
+        # 3) 최종 리스트 반환 (shuffle 옵션 반영)
+        return scenario_dict_to_list(scenario_dict, shuffle=scenario_filter.shuffle)
+
 
     @property
     def repartition_strategy(self) -> RepartitionStrategy:
