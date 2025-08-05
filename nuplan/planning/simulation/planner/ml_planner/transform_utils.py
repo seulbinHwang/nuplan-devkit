@@ -156,7 +156,7 @@ def _get_absolute_agent_states_from_numpy_poses(
     """
     Converts an array of relative numpy poses to a list of absolute EgoState objects.
 
-    :param poses: input relative poses
+    :param poses: input relative poses # (80, 3)
     :param ego_history: the history of the ego state, including the current
     :param timesteps: timestamps corresponding to each state
     :return: list of agent states
@@ -183,7 +183,7 @@ def transform_predictions_to_states(
     """
     Transform an array of pose predictions to a list of EgoState.
 
-    :param predicted_poses: input relative poses
+    :param predicted_poses: input relative poses # (80, 3)
     :param ego_history: the history of the ego state, including the current
     :param future_horizon: [s] future time horizon
     :param step_interval: [s] interval between steps in the array
