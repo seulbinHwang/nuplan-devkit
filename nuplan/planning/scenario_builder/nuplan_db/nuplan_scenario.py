@@ -381,9 +381,9 @@ class NuPlanScenario(AbstractScenario):
         # TODO: token_to_position 는 디버깅용 이므로, 디버깅이 끝나면 지우는 것이 좋습니다.
         token_to_position: Dict[str, Optional[List[np.ndarray]]] = {}
         # ─────────── 2단계: 에이전트별 경로 생성 ────────────
-        for agent_token, frame_list in token_to_trajectory.items():
+        for agent_token, agent_list in token_to_trajectory.items():
             token_to_position[agent_token] = []
-            if not frame_list:
+            if not agent_list:
                 token_to_route_roadblock_ids[agent_token] = None
                 continue
 
@@ -394,8 +394,8 @@ class NuPlanScenario(AbstractScenario):
                 'RoadBlockGraphEdgeMapObject'] = set()
             sampled_points_inside_connector: List['Point2D'] = []
 
-            for time_idx, frame in enumerate(frame_list):  # 시간 순
-                npc_point = frame.center.point
+            for time_idx, agent_ in enumerate(agent_list):  # 시간 순
+                npc_point = agent_.center.point
                 token_to_position[agent_token].append(
                     np.array([npc_point.x, npc_point.y]))
                 current_roadblocks = set(
@@ -417,7 +417,7 @@ class NuPlanScenario(AbstractScenario):
                     connector_candidate_objects.update(current_connectors)
                     sampled_points_inside_connector.append(npc_point)
                     if time_idx == len(
-                            frame_list) - 1:  # 마지막 프레임 # 8b5f797c287856f0
+                            agent_list) - 1:  # 마지막 프레임 # 8b5f797c287856f0
                         inside_connector_flag = _decide_roadblock_ids_at_connector(
                             connector_candidate_objects,
                             sampled_points_inside_connector, roadblock_sequence,
