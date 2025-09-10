@@ -1,52 +1,59 @@
 aioboto3
 aiofiles
-bokeh==2.4.3  # Used in the nuBoard dashboard
-boto3==1.24.59  # Used in s3_store.py to download data from S3.
-cachetools  # Used widely
-casadi  # Used for optimization solving
-control==0.9.1  # Used for LQR controller synthesis
-coverage  # Used in computing code coverage
-docker  # To run remote submissions
-Fiona  # Used in GpkgMapsDB.py
-geopandas>=0.12.1  # Used to read maps
-grpcio==1.43.0  # Used for communication with submission container
-grpcio-tools==1.43.0  # Used for communication with submission container
+bokeh==2.4.3
+boto3==1.24.59
+cachetools
+casadi
+control==0.9.1
+coverage
+docker
+Fiona
+geopandas>=0.12.1
+grpcio-tools==1.43.0            # (원래) ← 이 줄은 아래처럼 올리는 걸 권장
+grpcio==1.43.0                   # (원래) ← 이 줄도 아래처럼 올리는 걸 권장
 guppy3==3.1.2
 hydra-core==1.1.0
 omegaconf==2.1.1
 hypothesis
 joblib
-jupyter  # Used to show the notebook
+jupyter
 jupyterlab
-matplotlib  # Used for rendering
+matplotlib
 mock
 moto
-nest_asyncio  # Used to nest event loops when running nuBoard/jupyter
+nest_asyncio
 numpy==1.23.4
-opencv-python==4.7.0.72  # Used widely
-pandas    # Used widely
-Pillow    # Used widely to render images
-pre-commit  # Used in pre-commit hooks
-psutil  # Used widely to get the number of CPUs
-pyarrow # For parquet
-pyinstrument    # Used widely as profiler
-pyogrio # A performant backend for geopandas
-pyquaternion>=0.9.5  # Used widely, avoid known bug with quaternion slerp
-pytest    # Used widely
-rasterio  # Used in GpkgMapsDB.py
-ray # Used widely
-requests  # Used in BlobStore classes
+opencv-python==4.7.0.72
+pandas
+Pillow
+pre-commit
+psutil
+pyarrow
+pyinstrument
+pyogrio
+pyquaternion>=0.9.5
+pytest
+rasterio
+ray
+requests
 retry
-rtree # Used in occupancy maps
-s3fs # Used by pandas to read from/write to s3
-scipy  # Used widely
-selenium # Used in bokeh export png
-Shapely>=2.0.0  # Used widely
-SQLAlchemy==1.4.27  # older versions don't work with some table definitions
-sympy  # Use for symbolic algebra
-testbook  # Used in testing jupyter notebooks
-tornado  # Used in nuboard.py
-tqdm  # Used widely
-typer # Used for cli
-ujson  # Used in serialiation_callback.py
-urllib3  # Used in s3_store.py
+rtree
+s3fs
+scipy
+selenium
+Shapely>=2.0.0
+SQLAlchemy==1.4.27
+sympy
+testbook
+tornado
+tqdm
+typer
+ujson
+urllib3                          # (원래) ← 이 줄은 아래처럼 핀을 권장
+# ===== 여기서부터 권장 수정안 =====
+# TensorBoard 2.x와의 호환을 위해 grpcio를 최소 1.48 이상으로
+grpcio>=1.48,<2
+grpcio-tools>=1.48,<2
+
+# boto3 1.24.x(botocore 1.27.x)와의 호환을 위해 urllib3는 2.x 금지
+urllib3<2
