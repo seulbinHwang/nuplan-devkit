@@ -41,7 +41,6 @@ rtree # Used in occupancy maps
 s3fs # Used by pandas to read from/write to s3
 scipy  # Used widely
 selenium # Used in bokeh export png
-setuptools==59.5.0  # Used in setup.py, pinned to not break pytorch
 Shapely>=2.0.0  # Used widely
 SQLAlchemy==1.4.27  # older versions don't work with some table definitions
 sympy  # Use for symbolic algebra
