@@ -9,8 +9,8 @@ coverage
 docker
 Fiona
 geopandas>=0.12.1
-grpcio-tools==1.43.0            # (원래) ← 이 줄은 아래처럼 올리는 걸 권장
-grpcio==1.43.0                   # (원래) ← 이 줄도 아래처럼 올리는 걸 권장
+grpcio==1.56.2
+grpcio-tools==1.56.2
 guppy3==3.1.2
 hydra-core==1.1.0
 omegaconf==2.1.1
@@ -49,11 +49,4 @@ tornado
 tqdm
 typer
 ujson
-urllib3                          # (원래) ← 이 줄은 아래처럼 핀을 권장
-# ===== 여기서부터 권장 수정안 =====
-# TensorBoard 2.x와의 호환을 위해 grpcio를 최소 1.48 이상으로
-grpcio>=1.48,<2
-grpcio-tools>=1.48,<2
-
-# boto3 1.24.x(botocore 1.27.x)와의 호환을 위해 urllib3는 2.x 금지
 urllib3<2
