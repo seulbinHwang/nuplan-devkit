@@ -16,6 +16,8 @@ def build_observations(observation_cfg: DictConfig, scenario: AbstractScenario) 
     :param observation_cfg: config of a planner
     :param scenario: scenario
     :return AbstractObservation
+
+    /home/user/PycharmProjects/nuplan-devkit/nuplan/planning/script/builders/observation_builder.py
     """
     if is_TorchModuleWrapper_config(observation_cfg):
         # Build model and feature builders needed to run an ML model in simulation

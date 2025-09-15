@@ -42,3 +42,6 @@ target_builders:
   - _target_: nuplan.planning.training.preprocessing.target_builders.ego_trajectory_target_builder.EgoTrajectoryTargetBuilder
     _convert_: 'all'
     future_trajectory_sampling: ${model.future_trajectory_sampling}
+
+# nuplan.planning.training.preprocessing.target_builders.ego_trajectory_target_builder.EgoTrajectoryTargetBuilder
+# nuplan.planning.training.preprocessing.feature_builders.ego_trajectory_with_past_target_builder.EgoTrajectoryWithPastTargetBuilder
